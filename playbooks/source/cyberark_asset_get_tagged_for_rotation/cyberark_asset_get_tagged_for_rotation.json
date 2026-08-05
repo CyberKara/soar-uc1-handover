@@ -1,0 +1,67 @@
+{
+    "name": "cyberark_asset_get_tagged_for_rotation",
+    "custom_function_id": "08d5271099580c77df1bba3afa6ace0aa78a75dc",
+    "description": "Discover CyberArk rotation targets from the cyberark_ccp_rotation_state list.",
+    "draft_mode": false,
+    "inputs": [
+        {
+            "name": "list_name",
+            "description": "Custom list name (default: cyberark_ccp_rotation_state).",
+            "placeholder": "cyberark_ccp_rotation_state",
+            "contains": [],
+            "required": false
+        }
+    ],
+    "outputs": [
+        {
+            "data_path": "asset_name",
+            "description": "Target asset name.",
+            "contains_type": []
+        },
+        {
+            "data_path": "asset_id",
+            "description": "Target asset numeric ID.",
+            "contains_type": [
+                "phantom asset id"
+            ]
+        },
+        {
+            "data_path": "safe",
+            "description": "CyberArk safe name from the state list.",
+            "contains_type": []
+        },
+        {
+            "data_path": "username",
+            "description": "Actual username value read from the asset config.",
+            "contains_type": []
+        },
+        {
+            "data_path": "user_field",
+            "description": "Config field name that holds the username.",
+            "contains_type": []
+        },
+        {
+            "data_path": "pwd_field",
+            "description": "Config field name for the password.",
+            "contains_type": []
+        },
+        {
+            "data_path": "address",
+            "description": "CyberArk address filter for disambiguating accounts with the same username.",
+            "contains_type": []
+        },
+        {
+            "data_path": "app_name",
+            "description": "Connector/app name for the target asset.",
+            "contains_type": []
+        },
+        {
+            "data_path": "total_count",
+            "description": "Total number of discovered rotation targets.",
+            "contains_type": []
+        }
+    ],
+    "outputs_type": "list",
+    "platform_version": "6.4.1.361",
+    "python_version": "3.13"
+}

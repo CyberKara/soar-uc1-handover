@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="CyberArk Central Credential Provider">
+  <!-- Isometric cube mark approximating CyberArk's brand geometry (nested
+       quadrilateral facets, blue gradient family) and brand color family
+       sourced from the official cyberark-logo-dark.svg: navy #173159,
+       gradient stops #38B1E6 -> #329CD7 -> #296FB8. -->
+  <polygon points="100,25 161,60 100,95 39,60" fill="#38B1E6"/>
+  <polygon points="161,60 161,130 100,165 100,95" fill="#296FB8"/>
+  <polygon points="39,60 100,95 100,165 39,130" fill="#329CD7"/>
+  <polygon points="100,25 161,60 161,130 100,165 39,130 39,60" fill="none" stroke="#173159" stroke-width="3" stroke-linejoin="round"/>
+</svg>

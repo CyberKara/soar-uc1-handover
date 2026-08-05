@@ -1,6 +1,6 @@
 # UC1 — Automated Credential Rotation — Air-Gapped Handover Package
 
-Generated 2026-08-05 18:03 UTC from `credential_rotation` (source env: `soar8`).
+Generated 2026-08-05 18:33 UTC from `credential_rotation` (source env: `soar8`).
 
 This package is self-contained — everything needed to deploy this use case by hand
 in an environment with no network access back to this repo or to `soar8`.
@@ -18,8 +18,10 @@ in an environment with no network access back to this repo or to `soar8`.
 | Path | What |
 |------|------|
 | `connectors/` | Connector app package(s): cyberark_ccp-v1.0.29.tgz |
+| `connectors/source/` | Same connector(s), extracted — for reading, not for import |
 | `playbooks/*.tgz` (CFs) | cyberark_asset_update_configuration, cyberark_asset_get_tagged_for_rotation |
 | `playbooks/*.tgz` (PBs) | cyberark_credential_rotation, cyberark_rotation_orchestrator, cyberark_recheck_handler |
+| `playbooks/source/` | Same CFs/playbooks, extracted — for reading, not for import |
 | `assets/*.json` | Asset config templates (credentials redacted — see below) |
 | `custom_lists/*.json` | Custom list schema (header row only — see Bootstrapping below) |
 | `docs/` | Implementation plan doc, for full design context |
@@ -27,6 +29,8 @@ in an environment with no network access back to this repo or to `soar8`.
 ## Install order
 
 1. **Install the connector app(s)** — Apps > Install App, upload each file in `connectors/`.
+   (`connectors/source/` is the same code extracted for reading — don't import from there,
+   the GUI needs the `.tgz`.)
 2. **Configure assets from the templates in `assets/`** — Apps > Configure New Asset for
    each. Fields marked in a template's `redacted_fields` list are placeholders
    (`<<SET ME...>>`) — **you must fill these in yourself** from your own vault/CMDB; they
@@ -43,6 +47,8 @@ in an environment with no network access back to this repo or to `soar8`.
    payload directly.)
 4. **Import custom functions, then playbooks** (in that order — playbooks reference CFs)
    from `playbooks/*.tgz`, via Apps/Playbooks > Import in the target SOAR GUI.
+   (`playbooks/source/` is the same code extracted for reading — don't import from there,
+   the GUI needs the `.tgz`.)
 5. **Activate automation playbooks** and set their **Run As** user per the implementation
    plan doc's Setup Guide (see `docs/`).
 

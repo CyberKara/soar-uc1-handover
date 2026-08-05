@@ -1,0 +1,6 @@
+# False positive: _normalize_pem() in cyberark_ccp_connector.py lists PEM
+# header/footer marker strings (CERTIFICATE, PRIVATE KEY, RSA/EC PRIVATE KEY)
+# to detect and normalize pasted cert/key blocks. No actual key material is
+# present — gitleaks' private-key rule is a literal string match with no
+# code-semantics awareness. Verified by reading the surrounding function.
+connectors/source/cyberark_ccp/cyberark_ccp_connector.py:private-key:334

@@ -1,0 +1,215 @@
+{
+    "blockly": false,
+    "blockly_xml": "<xml></xml>",
+    "category": "Credential Management",
+    "coa": {
+        "data": {
+            "hash": "",
+            "edges": [
+                {
+                    "id": "port_0_to_port_2",
+                    "sourceNode": "0",
+                    "sourcePort": "0_out",
+                    "targetNode": "2",
+                    "targetPort": "2_in"
+                },
+                {
+                    "id": "port_2_to_port_4",
+                    "sourceNode": "2",
+                    "sourcePort": "2_out",
+                    "targetNode": "4",
+                    "targetPort": "4_in"
+                },
+                {
+                    "id": "port_4_to_port_5",
+                    "sourceNode": "4",
+                    "sourcePort": "4_out",
+                    "targetNode": "5",
+                    "targetPort": "5_in"
+                },
+                {
+                    "id": "port_5_to_port_3",
+                    "sourceNode": "5",
+                    "sourcePort": "5_out",
+                    "targetNode": "3",
+                    "targetPort": "3_in"
+                },
+                {
+                    "id": "port_3_to_port_1",
+                    "sourceNode": "3",
+                    "sourcePort": "3_out",
+                    "targetNode": "1",
+                    "targetPort": "1_in"
+                }
+            ],
+            "nodes": {
+                "0": {
+                    "x": 190,
+                    "y": 0,
+                    "id": "0",
+                    "data": {
+                        "id": "0",
+                        "type": "start",
+                        "advanced": {
+                            "join": []
+                        },
+                        "functionName": "on_start"
+                    },
+                    "type": "start",
+                    "errors": {}
+                },
+                "1": {
+                    "x": 190,
+                    "y": 700,
+                    "id": "1",
+                    "data": {
+                        "id": "1",
+                        "type": "end",
+                        "advanced": {
+                            "join": []
+                        },
+                        "functionId": 1,
+                        "functionName": "on_finish"
+                    },
+                    "type": "end",
+                    "errors": {},
+                    "userCode": "\n"
+                },
+                "2": {
+                    "x": 190,
+                    "y": 140,
+                    "id": "2",
+                    "data": {
+                        "id": "2",
+                        "type": "code",
+                        "advanced": {
+                            "join": [],
+                            "note": "Iterates container artifacts by ID to find newest Recheck Request. Skips if no artifact or attempt > MAX_RECHECK_ATTEMPTS.",
+                            "customName": "check recheck artifact",
+                            "description": "Find latest Recheck Request artifact, enforce max-attempts guard (3), save recheck target to run_data.",
+                            "customNameId": 0
+                        },
+                        "functionId": 1,
+                        "functionName": "check_recheck_artifact",
+                        "inputParameters": [
+                            "artifact:*.name",
+                            "artifact:*.cef.cs1",
+                            "artifact:*.cef.cn1",
+                            "artifact:*.cef.cs2",
+                            "artifact:*.id"
+                        ],
+                        "outputVariables": [
+                            "target"
+                        ]
+                    },
+                    "type": "code",
+                    "errors": {},
+                    "userCode": "\n\n    # Code: artifact iteration to find latest \"Recheck Request\" + max-attempts guard. No native block\n    # iterates container artifacts and applies a bounded-retry guard in one step.\n    MAX_RECHECK_ATTEMPTS = 3\n    RECHECK_DELAY_SECONDS = 300\n\n    artifacts = phantom.collect2(\n        container=container,\n        datapath=[\n            \"artifact:*.name\",\n            \"artifact:*.cef.cs1\",\n            \"artifact:*.cef.cn1\",\n            \"artifact:*.cef.cs2\",\n            \"artifact:*.id\",\n        ]\n    )\n\n    # Find the most recent \"Recheck Request\" artifact (highest ID)\n    recheck = None\n    for row in artifacts:\n        name, target_asset, attempt, params_json, art_id = row\n        if name == \"Recheck Request\":\n            if recheck is None or (art_id or 0) > (recheck.get(\"id\") or 0):\n                recheck = {\n                    \"target_asset\": target_asset,\n                    \"attempt\": int(attempt or 1),\n                    \"params_json\": params_json,\n                    \"id\": art_id,\n                }\n\n    if not recheck:\n        phantom.debug(\"No Recheck Request artifacts found \u2014 skipping\")\n        return\n\n    target_asset = recheck[\"target_asset\"]\n    attempt = recheck[\"attempt\"]\n\n    if attempt > MAX_RECHECK_ATTEMPTS:\n        phantom.debug(\"Max recheck attempts ({}) exceeded for '{}' \u2014 stopping\".format(\n            MAX_RECHECK_ATTEMPTS, target_asset))\n\n        phantom.add_note(\n            container=container,\n            note_type=\"general\",\n            title=\"Recheck Failed - Max Attempts\",\n            content=\"Credential recheck for '{}' stopped after {} attempts. \"\n                    \"CyberArk password change may still be in progress. \"\n                    \"Manual intervention required.\".format(target_asset, MAX_RECHECK_ATTEMPTS),\n        )\n        return\n\n    check_recheck_artifact__target = recheck\n\n    phantom.debug(\"Waiting {}s before recheck attempt {}/{} for '{}'\".format(\n        RECHECK_DELAY_SECONDS, attempt, MAX_RECHECK_ATTEMPTS, target_asset))\n\n    ################################################################################\n"
+                },
+                "3": {
+                    "x": 190,
+                    "y": 560,
+                    "id": "3",
+                    "data": {
+                        "id": "3",
+                        "type": "code",
+                        "advanced": {
+                            "join": [],
+                            "note": "Multi-mutation callback: REST child read + state list upsert + note + optional retry artifact + severity re-eval. All sync platform APIs (no phantom.act/custom_function).",
+                            "customName": "process recheck result",
+                            "description": "Read recheck child output via REST, update state list, add note, create retry artifact or finalize.",
+                            "customNameId": 0
+                        },
+                        "functionId": 4,
+                        "functionName": "process_recheck_result",
+                        "inputParameters": [
+                            "check_recheck_artifact:custom_function:target"
+                        ],
+                        "outputVariables": []
+                    },
+                    "type": "code",
+                    "errors": {},
+                    "userCode": "\n\n    # Code: multi-mutation post-callback \u2014 REST child output read + state list upsert + note +\n    # retry artifact. Sync platform APIs only (phantom.add_note/set_list/set_severity/add_artifact);\n    # phantom.act/custom_function would race with on_finish inside this phantom.playbook callback chain.\n    # Guard: called via graph edge immediately after dispatch_recheck \u2014 child not done yet\n    if results is None:\n        return\n\n    MAX_RECHECK_ATTEMPTS = 3\n    STATE_LIST_NAME = \"cyberark_ccp_rotation_state\"\n\n    recheck = {}\n    try:\n        recheck = json.loads(phantom.get_run_data(key=\"check_recheck_artifact:target\") or \"{}\")\n    except Exception:\n        pass\n\n    target_asset = recheck.get(\"target_asset\", \"unknown\")\n    attempt = int(recheck.get(\"attempt\", 1))\n\n    # Read child PB output via REST (same pattern as cyberark_rotation collect_results)\n    result = None\n    try:\n        container_id = container.get(\"id\")\n        url = phantom.build_phantom_rest_url(\"playbook_run\")\n        resp = phantom.session_get(\n            url,\n            params={\n                \"_filter_container\": container_id,\n                \"sort\": \"id\",\n                \"order\": \"desc\",\n                \"page_size\": 10,\n            },\n            verify=False,\n        )\n        if resp.status_code == 200:\n            resp_json = resp.json()\n            for run in resp_json.get(\"data\", []):\n                misc = run.get(\"misc\") or {}\n                parent_info = misc.get(\"parent_playbook_run\") or {}\n                run_name = parent_info.get(\"child_playbook_run_name\", \"\")\n                if run_name == \"recheck_rotation\":\n                    outputs = run.get(\"outputs\") or []\n                    if outputs:\n                        first_out = outputs[0]\n                        result = json.loads(first_out) if isinstance(first_out, str) else first_out\n                    break\n    except Exception as e:\n        phantom.error(\"Failed to read recheck child output: {}\".format(e))\n\n    if not result:\n        result = {\"status\": \"unknown\", \"message\": \"No result from cyberark_credential_rotation\"}\n\n    status = result.get(\"status\", \"unknown\")\n    phantom.debug(\"Recheck result for '{}': status={}\".format(target_asset, status))\n\n    # Update state list\n    now_str = datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")\n    event_id = str(container.get(\"id\", \"\"))\n    soar_base = phantom.get_base_url() or \"\"\n    event_link = \"{}/mission/{}\".format(soar_base, event_id)\n\n    try:\n        state = {}\n        read_success, _msg, rows = phantom.get_list(list_name=STATE_LIST_NAME)\n        if read_success and rows:\n            for row in rows:\n                if row and len(row) >= 9 and row[0] != \"asset\":\n                    state[row[0]] = row\n\n        params = {}\n        try:\n            params = json.loads(recheck.get(\"params_json\", \"{}\"))\n        except Exception:\n            pass\n\n        state[target_asset] = [\n            target_asset,\n            state.get(target_asset, [\"\"] * 11)[1] if target_asset in state else \"\",\n            params.get(\"safe\", \"\"),\n            params.get(\"username\", \"\"),\n            params.get(\"address\", \"\"),\n            status,\n            (result.get(\"message\", \"\"))[:200],\n            now_str,\n            event_link,\n            params.get(\"user_field\", state.get(target_asset, [\"\"] * 11)[9] if target_asset in state else \"username\"),\n            params.get(\"pwd_field\", state.get(target_asset, [\"\"] * 11)[10] if target_asset in state else \"password\"),\n        ]\n\n        header = [\n            \"asset\", \"connector\", \"safe\", \"username\", \"address\",\n            \"status\", \"message\", \"last_rotated\", \"event_link\",\n            \"user_field\", \"pwd_field\",\n        ]\n        content = [header] + [state[k] for k in sorted(state)]\n        phantom.set_list(list_name=STATE_LIST_NAME, values=content)\n        phantom.debug(\"State list updated for '{}'\".format(target_asset))\n    except Exception as e:\n        phantom.error(\"Failed to update state list: {}\".format(e))\n\n    # Decide next action based on result\n    if status == \"success\" or status.startswith(\"rotated\"):\n        phantom.debug(\"Recheck succeeded for '{}'\".format(target_asset))\n        phantom.add_note(\n            container=container,\n            note_type=\"general\",\n            title=\"Recheck Succeeded - {}\".format(target_asset),\n            content=\"Credential recheck for '{}' succeeded on attempt {}.\\n\\n{}\".format(\n                target_asset, attempt, result.get(\"message\", \"\")),\n        )\n\n    elif result.get(\"password_change_in_process\") or status in (\"pending_recheck\", \"rotated (change pending)\"):\n        next_attempt = attempt + 1\n        if next_attempt > MAX_RECHECK_ATTEMPTS:\n            phantom.debug(\"Max attempts reached for '{}' after attempt {}\".format(\n                target_asset, attempt))\n            phantom.add_note(\n                container=container,\n                note_type=\"general\",\n                title=\"Recheck Failed - Max Attempts\",\n                content=\"Credential recheck for '{}' still pending after {} attempts. \"\n                        \"CyberArk password change may still be in progress. \"\n                        \"Manual intervention required.\\n\\n{}\".format(\n                            target_asset, MAX_RECHECK_ATTEMPTS, result.get(\"message\", \"\")),\n            )\n        else:\n            phantom.debug(\"Creating retry artifact for '{}' (attempt {})\".format(\n                target_asset, next_attempt))\n\n            cef_data = {\n                \"message\": \"Recheck request for {} (attempt {})\".format(target_asset, next_attempt),\n                \"cs1\": target_asset,\n                \"cs1Label\": \"target_asset\",\n                \"cn1\": next_attempt,\n                \"cn1Label\": \"attempt\",\n                \"cs2\": recheck.get(\"params_json\", \"{}\"),\n                \"cs2Label\": \"rotation_params\",\n            }\n\n            success_flag, msg, art_id = phantom.add_artifact(\n                container=container,\n                raw_data={},\n                cef_data=cef_data,\n                label=\"events\",\n                name=\"Recheck Request\",\n                severity=\"low\",\n                identifier=None,\n                artifact_type=\"network\",\n                run_automation=True,\n            )\n            phantom.debug(\"Retry artifact created: success={}, id={}, attempt={}\".format(\n                success_flag, art_id, next_attempt))\n\n    else:\n        phantom.debug(\"Recheck failed for '{}': {}\".format(target_asset, status))\n        phantom.add_note(\n            container=container,\n            note_type=\"general\",\n            title=\"Recheck Failed - {}\".format(target_asset),\n            content=\"Credential recheck for '{}' failed on attempt {}.\\n\\nStatus: {}\\n{}\".format(\n                target_asset, attempt, status, result.get(\"message\", \"\")),\n        )\n\n    # Re-evaluate container severity based on all asset statuses in state list\n    try:\n        all_statuses = []\n        read_ok, _, all_rows = phantom.get_list(list_name=STATE_LIST_NAME)\n        if read_ok and all_rows:\n            for row in all_rows:\n                if row and len(row) >= 6 and row[0] != \"asset\":\n                    all_statuses.append(row[5])\n\n        if all_statuses:\n            if all(s == \"success\" for s in all_statuses):\n                new_sev = \"low\"\n            elif any(s == \"failed\" for s in all_statuses):\n                new_sev = \"high\"\n            elif any(s in (\"pending_recheck\", \"rotated (change pending)\") for s in all_statuses):\n                new_sev = \"medium\"\n            else:\n                new_sev = \"medium\"\n        else:\n            new_sev = \"low\"\n\n        phantom.set_severity(container=container, severity=new_sev)\n        phantom.debug(\"Container severity updated to '{}'\".format(new_sev))\n    except Exception as e:\n        phantom.error(\"Failed to update container severity: {}\".format(e))\n\n        ################################################################################\n"
+                },
+                "4": {
+                    "x": 190,
+                    "y": 280,
+                    "id": "4",
+                    "data": {
+                        "id": "4",
+                        "type": "action",
+                        "action": "no op",
+                        "advanced": {
+                            "join": [],
+                            "customName": "wait before recheck",
+                            "customNameId": 0
+                        },
+                        "connector": "Phantom",
+                        "actionType": "investigate",
+                        "functionId": 2,
+                        "parameters": {
+                            "sleep_seconds": "300"
+                        },
+                        "connectorId": "deb82aa9-22cc-4675-9cf1-534b8d006eb7",
+                        "functionName": "wait_before_recheck",
+                        "connectorConfigs": [
+                            "soar6"
+                        ],
+                        "connectorVersion": "v1",
+                        "requiredParameters": [
+                            {
+                                "field": "sleep_seconds",
+                                "default": "",
+                                "data_type": "numeric"
+                            }
+                        ]
+                    },
+                    "type": "action",
+                    "errors": {}
+                },
+                "5": {
+                    "x": 190,
+                    "y": 420,
+                    "id": "5",
+                    "data": {
+                        "id": "5",
+                        "type": "code",
+                        "advanced": {
+                            "join": [],
+                            "note": "Reads recheck target from run_data (set by check_recheck_artifact). Passes target_asset, safe, username, pwd_field, user_field, address.",
+                            "customName": "dispatch recheck",
+                            "description": "Parse rotation_params from recheck artifact CEF, dispatch cyberark_credential_rotation child with same inputs.",
+                            "customNameId": 0
+                        },
+                        "functionId": 3,
+                        "functionName": "dispatch_recheck",
+                        "inputParameters": [
+                            "check_recheck_artifact:custom_function:target"
+                        ],
+                        "outputVariables": []
+                    },
+                    "type": "code",
+                    "errors": {},
+                    "userCode": "\n\n    # Code, not playbook block: inputs come from run_data (check_recheck_artifact:target).\n    # A native playbook block would require the input to be a standard datapath, not a JSON blob.\n    recheck = {}\n    try:\n        recheck = json.loads(phantom.get_run_data(key=\"check_recheck_artifact:target\") or \"{}\")\n    except Exception:\n        pass\n\n    target_asset = recheck.get(\"target_asset\", \"unknown\")\n    attempt = recheck.get(\"attempt\", 1)\n\n    # Parse rotation params and dispatch cyberark_credential_rotation\n    try:\n        params = json.loads(recheck.get(\"params_json\", \"{}\"))\n    except Exception:\n        params = {}\n\n    inputs = {\n        \"target_asset\": target_asset,\n        \"safe\": params.get(\"safe\", \"\"),\n        \"username\": params.get(\"username\", \"\"),\n        \"pwd_field\": params.get(\"pwd_field\", \"password\"),\n        \"user_field\": params.get(\"user_field\", \"username\"),\n    }\n    if params.get(\"address\"):\n        inputs[\"address\"] = params[\"address\"]\n\n    phantom.debug(\"Dispatching cyberark_credential_rotation for '{}' (attempt {})\".format(\n        target_asset, attempt))\n\n    phantom.playbook(\n        playbook=\"local/cyberark_credential_rotation\",\n        container=container,\n        name=\"recheck_rotation\",\n        inputs=inputs,\n        callback=process_recheck_result,\n    )\n\n    ################################################################################\n"
+                }
+            },
+            "notes": "",
+            "description": "Handles artifact-based credential rechecks. Triggers on Recheck Request artifact, uses no-op action to wait 5min, retries cyberark_credential_rotation, bounded to 3 attempts."
+        },
+        "input_spec": [],
+        "output_spec": [],
+        "playbook_type": "automation",
+        "python_version": "3",
+        "schema": "5.0.5",
+        "version": "6.1.0"
+    },
+    "create_time": "2026-08-04T19:01:59.703267Z",
+    "draft_mode": false,
+    "labels": [
+        "cyberark_ccp"
+    ],
+    "tags": [
+        "credential_rotation",
+        "cyberark_ccp"
+    ]
+}
