@@ -197,7 +197,7 @@ creation — the `on_start` guard (check for "Recheck Request" artifact) is what
 | `splunk_primary` | 23 | description: TestSafe, address=splunk.internal.lab |
 | `splunk_dr` | 24 | description: TestSafe, address=splunk-dr.internal.lab |
 | `app_server_test` | 25 | description: TestSafe/svc_rotating — used for APPAP282E testing |
-| `soar6` (Phantom self-ref) | 14 | points to `<redacted-lab-internal-ip>:9443` — used for "no op" wait in recheck handler |
+| `soar6` (Phantom self-ref) | 14 | points to 192.168.1.168:9443 — used for "no op" wait in recheck handler |
 
 ---
 

@@ -1,17 +1,11 @@
 # UC1 — Automated Credential Rotation — Paquet de transfert (déploiement air-gapped)
 
-Généré le 2026-08-05 18:33 UTC à partir de `credential_rotation` (environnement source : `soar8`).
+Généré le 2026-08-06 21:29 UTC à partir de `credential_rotation` (environnement source : `soar8`).
 
 Ce paquet est autonome — tout ce qu'il faut pour déployer ce cas d'usage manuellement
 dans un environnement sans accès réseau vers ce dépôt ni vers `soar8`.
 
 *(Version anglaise : `HANDOVER.md` dans ce même dossier.)*
-
-> **Remarque :** cette copie est publiée sur un dépôt GitHub privé. Au-delà du
-> masquage habituel des champs de type `password`, les champs `base_url`,
-> `client_ca` et `client_cert` de l'asset mock CyberArk CCP (IP interne au labo
-> + matériel de certificat) ont également été masqués ici — renseignez-les
-> tous depuis votre propre environnement, comme `client_key`.
 
 ## Contenu
 

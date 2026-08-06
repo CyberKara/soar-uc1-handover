@@ -4,19 +4,19 @@
   "configuration": {
     "app_id": "SOAR_App",
     "timeout": 60,
-    "base_url": "<<SET ME \u2014 see HANDOVER.md, your CyberArk CCP host, e.g. https://<host>:8443>>",
-    "client_ca": "<<SET ME \u2014 see HANDOVER.md, re-enter your CA certificate>>",
+    "base_url": "<<SET ME \u2014 this was the LAB's internal mock endpoint, not a real appliance URL. Replace with your target system's real address.>>",
+    "client_ca": "<<SET ME \u2014 see HANDOVER.md, re-enter from your vault/CMDB>>",
     "test_safe": "ProdSafe",
     "client_key": "<<SET ME \u2014 see HANDOVER.md, re-enter from your vault/CMDB>>",
     "verify_ssl": true,
-    "client_cert": "<<SET ME \u2014 see HANDOVER.md, re-enter your client certificate>>",
+    "client_cert": "<<SET ME \u2014 see HANDOVER.md, re-enter from your vault/CMDB>>",
     "test_username": "admin_db"
   },
   "redacted_fields": [
-    "client_key",
     "base_url",
     "client_ca",
+    "client_key",
     "client_cert"
   ],
-  "note": "Reference for manually configuring this asset via Apps > Configure New Asset in the target SOAR GUI. Not a REST-postable creation payload \u2014 asset creation semantics differ from the read-merge-write update pattern used elsewhere in this toolchain, and this has not been verified as directly importable. base_url/client_ca/client_cert were additionally redacted in this copy (lab-internal IP and cert material) beyond the tool's default password-only redaction, since this copy is published to a GitHub repo rather than transferred air-gapped."
+  "note": "Reference for manually configuring this asset via Apps > Configure New Asset in the target SOAR GUI. Not a REST-postable creation payload \u2014 asset creation semantics differ from the read-merge-write update pattern used elsewhere in this toolchain, and this has not been verified as directly importable. SOURCE ASSET IS A LAB MOCK/TEST ASSET: only fields in `redacted_fields` are guaranteed placeholders \u2014 other values (poll intervals, disposition filters, timeouts, etc.) reflect this lab's test tuning, not necessarily your production requirements. Review every field before reuse."
 }
