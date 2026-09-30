@@ -3,7 +3,7 @@ CyberArk Recheck Handler
 
 Automation playbook (trigger: artifact_created, label=cyberark_ccp). Retries
 cyberark_credential_rotation after an APPAP282E "Recheck Request" artifact,
-bounded to 3 attempts. Architecture/flow detail: docs/usecases/uc1_dev_notes.md
+bounded to 3 attempts. Architecture/flow detail: docs/uc1_dev_notes.md
 """
 
 
@@ -14,24 +14,15 @@ from datetime import datetime
 
 
 def _recheck_run_name(target_asset, attempt):
-    """Per-target, per-attempt dispatch name — NOT a shared literal.
-
-    Previously every recheck dispatch used the fixed name "recheck_rotation"
-    regardless of which target it was for, which made both artifact-claim
-    checking and child-result lookup unable to distinguish between two
-    different targets' concurrent recheck attempts. Sanitized since asset
-    names flow into a playbook_run name field.
-    """
+    """Per-target, per-attempt dispatch name (not a shared literal).
+    Sanitized: asset names flow into a playbook_run name."""
     safe_target = re.sub(r"[^A-Za-z0-9_]", "_", str(target_asset or "unknown"))
     return "recheck_{}_{}".format(safe_target, attempt)
 
 
 def _recheck_already_dispatched(container, target_asset, attempt):
-    """REST idempotency check — has this target/attempt's recheck already been
-    dispatched by this or a concurrently-running execution? Same pattern as
-    cyberark_rotation_orchestrator's collect_results (REST-based, not local
-    run_data, since run_data isn't shared across separate automation-triggered
-    executions)."""
+    """REST idempotency check: was this target/attempt's recheck already dispatched?
+    REST, not run_data, since run_data isn't shared across automation-triggered executions."""
     run_name = _recheck_run_name(target_asset, attempt)
     try:
         container_id = container.get("id")
@@ -74,8 +65,7 @@ def check_recheck_artifact(action=None, success=None, container=None, results=No
     ## Custom Code Start
     ################################################################################
 
-    # Code: artifact iteration to find latest "Recheck Request" + max-attempts guard. No native block
-    # iterates container artifacts and applies a bounded-retry guard in one step.
+    # Finds the latest "Recheck Request" artifact and applies the max-attempts guard
     MAX_RECHECK_ATTEMPTS = 3
     RECHECK_DELAY_SECONDS = 300
 
@@ -90,7 +80,7 @@ def check_recheck_artifact(action=None, success=None, container=None, results=No
         ]
     )
 
-    # Highest-id-first, skip-if-already-dispatched — see uc1_dev_notes.md
+    # Highest-id-first, skip-if-already-dispatched
     candidates = []
     for row in artifacts:
         name, target_asset, attempt, params_json, art_id = row
@@ -169,8 +159,7 @@ def dispatch_recheck(action=None, success=None, container=None, results=None, ha
     ## Custom Code Start
     ################################################################################
 
-    # Code, not playbook block: inputs come from run_data (check_recheck_artifact:target).
-    # A native playbook block would require the input to be a standard datapath, not a JSON blob.
+    # Inputs come from run_data (check_recheck_artifact:target), not a standard datapath
     recheck = {}
     try:
         recheck = json.loads(phantom.get_run_data(key="check_recheck_artifact:target") or "{}")
@@ -222,7 +211,7 @@ def process_recheck_result(action=None, success=None, container=None, results=No
     ## Custom Code Start
     ################################################################################
 
-    # Sync-only multi-mutation post-callback — see uc1_dev_notes.md
+    # Sync-only multi-mutation post-callback
     if results is None:
         return
 
@@ -295,7 +284,7 @@ def process_recheck_result(action=None, success=None, container=None, results=No
         except Exception:
             pass
 
-        # Column order matches update_rotation_state — see uc1_dev_notes.md
+        # Column order matches update_rotation_state
         existing = state.get(target_asset, [""] * 11)
         state[target_asset] = [
             target_asset,

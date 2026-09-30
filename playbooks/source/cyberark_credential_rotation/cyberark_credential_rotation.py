@@ -3,7 +3,7 @@ Credential Rotation - CyberArk CCP
 
 Fetches fresh credentials from CyberArk CCP vault and updates a target SOAR
 asset's configuration. Called as a utility playbook by cyberark_rotation_orchestrator.
-Flow/architecture detail: docs/usecases/uc1_dev_notes.md
+Flow/architecture detail: docs/uc1_dev_notes.md
 
 Inputs:
   - target_asset: Name or ID of the target asset to update
@@ -83,7 +83,7 @@ def get_secret_from_vault(action=None, success=None, container=None, results=Non
     ## Custom Code Start
     ################################################################################
 
-    # Plain native-action passthrough — see uc1_dev_notes.md
+    # Plain native-action passthrough
     param = {
         "safe": safe_value,
         "username": username_value,
@@ -114,7 +114,6 @@ def build_config_update(action=None, success=None, container=None, results=None,
     ## Custom Code Start
     ################################################################################
 
-    # Code, not utility: parses get_secret action result + APPAP282E detection. No CF wraps this logic.
     get_secret_result = phantom.collect2(
         container=container,
         datapath=[
@@ -229,8 +228,7 @@ def run_test_connectivity(action=None, success=None, container=None, results=Non
     ## Custom Code Start
     ################################################################################
 
-    # Code, not action: sync REST action_run + poll. phantom.act("test connectivity") + callback would race
-    # with on_finish because this runs inside an update_target_asset custom_function callback chain.
+    # Sync REST action_run + poll: phantom.act("test connectivity") + callback would race with on_finish
     import time
 
     # Read target_asset from playbook input (not from CF output which can be empty)
@@ -239,7 +237,6 @@ def run_test_connectivity(action=None, success=None, container=None, results=Non
     playbook_input_username = phantom.collect2(container=container, datapath=["playbook_input:username"])
     target_asset = playbook_input_target_asset[0][0] if playbook_input_target_asset else None
 
-    # Check CF result before running connectivity test
     update_result = phantom.collect2(
         container=container,
         datapath=[
@@ -264,7 +261,6 @@ def run_test_connectivity(action=None, success=None, container=None, results=Non
 
     phantom.debug("Asset '{}' updated successfully, running test connectivity".format(target_asset))
 
-    # Synchronous REST-based test connectivity (avoids VPE race condition with async phantom.act callback)
     test_status = None
     test_message = ""
     try:
@@ -358,8 +354,7 @@ def format_error(action=None, success=None, container=None, results=None, handle
     ## Custom Code Start
     ################################################################################
 
-    # Code, not format: conditional error classification (2-level run_data fallback + APPAP282E substring
-    # match + pending_recheck vs failed branching). Format blocks only do {0}/{1} string templating.
+    # Error classification: 2-level run_data fallback, APPAP282E substring match, pending_recheck vs failed
     error_msg = None
     try:
         error_msg = json.loads(phantom.get_run_data(key="build_config_update:error"))

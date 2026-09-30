@@ -27,14 +27,12 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
         "message": ""
     }
 
-    # Validate inputs
     if asset is None:
         raise ValueError("asset parameter is required (numeric ID or name)")
 
     if configuration_updates is None:
         raise ValueError("configuration_updates parameter is required (JSON string)")
 
-    # Parse configuration_updates if string
     if isinstance(configuration_updates, str):
         try:
             updates = json.loads(configuration_updates)
@@ -48,7 +46,6 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
     if not updates:
         raise ValueError("configuration_updates cannot be empty")
 
-    # Resolve asset ID
     url = phantom.build_phantom_rest_url("asset")
 
     if isinstance(asset, int):
@@ -68,7 +65,6 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
     else:
         raise TypeError("asset must be a numeric ID or string name")
 
-    # Step 1: Read current asset configuration
     current = phantom.requests.get(uri=asset_url, verify=False).json()
 
     if not current.get("id"):
@@ -78,15 +74,14 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
     asset_id = current["id"]
     asset_name = current.get("name", "")
 
-    # Step 2: Merge updates into current config (only overwrite specified fields)
     merged_config = dict(current_config)
     updated_fields = []
     for key, value in updates.items():
         merged_config[key] = value
         updated_fields.append(key)
 
-    # Step 3: Write back full config + tags/name/description (see uc1_dev_notes.md
-    # re: password-type field risk — a known open item, not yet fixed here)
+    # Writes back the full config + tags/name/description. Known open risk with
+    # password-type fields on this path: see docs/uc1_dev_notes.md
     payload = {
         "configuration": merged_config,
         "tags": current.get("tags", []),
@@ -108,6 +103,5 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
             response.get("message", "Unknown error")
         )
 
-    # Return a JSON-serializable object
     assert json.dumps(outputs)
     return outputs

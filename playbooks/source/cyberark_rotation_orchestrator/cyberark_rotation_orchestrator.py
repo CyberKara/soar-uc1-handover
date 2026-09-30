@@ -3,7 +3,7 @@ CyberArk Rotation Orchestrator
 
 Automation playbook (trigger: artifact_created, label=cyberark_ccp). Discovers
 tagged assets, dispatches cyberark_credential_rotation per target, collects
-results, updates the state list. Architecture/flow detail: docs/usecases/uc1_dev_notes.md
+results, updates the state list. Architecture/flow detail: docs/uc1_dev_notes.md
 """
 
 
@@ -16,7 +16,7 @@ from datetime import datetime
 def on_start(container):
     phantom.debug('on_start() called')
 
-    # Guard: only run once per container (see uc1_dev_notes.md)
+    # Guard: only run once per container
     existing = phantom.collect2(container=container, datapath=["artifact:*.name"])
     for row in existing:
         if row[0] == "Recheck Request":
@@ -47,7 +47,7 @@ def read_discover_result(action=None, success=None, container=None, results=None
     ## Custom Code Start
     ################################################################################
 
-    # Bridge block working around a VPE rendering bug — see uc1_dev_notes.md
+    # Bridge block working around a VPE rendering bug
     target_result = phantom.collect2(
         container=container,
         datapath=["discover_targets:custom_function_result.data.total_count"]
@@ -95,7 +95,7 @@ def dispatch_rotations(action=None, success=None, container=None, results=None, 
     ## Custom Code Start
     ################################################################################
 
-    # Dynamic N-target fan-out — see uc1_dev_notes.md
+    # Dynamic N-target fan-out
     targets_info = []
 
     target_data = phantom.collect2(
@@ -185,13 +185,13 @@ def collect_results(action=None, success=None, container=None, results=None, han
     ## Custom Code Start
     ################################################################################
 
-    # REST-based child output aggregation — see uc1_dev_notes.md
+    # REST-based child output aggregation
     if results is None:
         return
 
     total = int(phantom.get_run_data(key="dispatch_rotations:total") or "0")
 
-    # Idempotent + paginated REST count — see uc1_dev_notes.md
+    # Idempotent + paginated REST count
     child_runs_by_name = {}
     PAGE_SIZE = 50
     MAX_PAGES = 20  # safety bound: 1000 rows, far beyond any realistic container
@@ -287,7 +287,7 @@ def build_summary(action=None, success=None, container=None, results=None, handl
     ## Custom Code Start
     ################################################################################
 
-    # Sync-only code block (callback chain) — see uc1_dev_notes.md
+    # Sync-only code block (callback chain)
     _completed = int(phantom.get_run_data(key="collect_results:completed") or "0")
     _total = int(phantom.get_run_data(key="dispatch_rotations:total") or "0")
     if _completed < _total:
@@ -387,7 +387,7 @@ def add_summary_note(action=None, success=None, container=None, results=None, ha
     build_summary__note_title = json.loads(phantom.get_run_data(key="build_summary:note_title"))
     build_summary__note_content = json.loads(phantom.get_run_data(key="build_summary:note_content"))
 
-    # Defense-in-depth against collect_results' non-atomic guard — see uc1_dev_notes.md
+    # Defense-in-depth against collect_results' non-atomic guard
     try:
         notes_url = phantom.build_phantom_rest_url("container", container.get("id"), "notes")
         resp = phantom.session_get(notes_url, verify=False)
@@ -400,7 +400,7 @@ def add_summary_note(action=None, success=None, container=None, results=None, ha
     except Exception as e:
         phantom.error("Failed to check for existing summary note: {}".format(e))
 
-    # Sync add_note (callback chain) — see uc1_dev_notes.md
+    # Sync add_note (callback chain)
     phantom.add_note(
         container=container,
         note_type="general",
@@ -423,7 +423,7 @@ def update_rotation_state(action=None, success=None, container=None, results=Non
     ## Custom Code Start
     ################################################################################
 
-    # Sync list read-merge-write (callback chain) — see uc1_dev_notes.md
+    # Sync list read-merge-write (callback chain)
     STATE_LIST_NAME = "cyberark_ccp_rotation_state"
 
     targets_info = []
@@ -451,7 +451,7 @@ def update_rotation_state(action=None, success=None, container=None, results=Non
                 if row and len(row) >= 11 and row[0] != "asset":
                     state[row[0]] = row
 
-        # Column order: vault-mapping (1-5) then status (6-11) — see uc1_dev_notes.md
+        # Column order: vault-mapping (1-5) then status (6-11)
         for idx, r in enumerate(all_results):
             t = targets_info[idx] if idx < len(targets_info) else {}
             asset = t.get("asset", "?")
@@ -490,7 +490,7 @@ def update_severity(action=None, success=None, container=None, results=None, han
 
     build_summary__severity = json.loads(phantom.get_run_data(key="build_summary:severity") or '"low"')
 
-    # Sync set_severity (no native equivalent, callback chain) — see uc1_dev_notes.md
+    # Sync set_severity (no native equivalent, callback chain)
     phantom.set_severity(container=container, severity=build_summary__severity)
 
     phantom.debug("Container severity set to '{}'".format(build_summary__severity))

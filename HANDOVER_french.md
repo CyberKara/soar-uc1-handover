@@ -18,7 +18,7 @@ dans un environnement sans accès réseau vers ce dépôt ni vers `soar8`.
 | `playbooks/source/` | Mêmes CF/playbooks, extraits — pour lecture, pas pour import |
 | `assets/*.json` | Modèles de configuration d'assets (identifiants masqués — voir ci-dessous) |
 | `custom_lists/*.json` | Schéma de la/les liste(s) personnalisée(s) (en-têtes uniquement — voir Amorçage ci-dessous) |
-| `docs/` | Document de plan d'implémentation, pour le contexte de conception complet |
+| `docs/` | Document de plan d'implémentation (contexte de conception complet) et `uc1_dev_notes.md` (raisons des choix de code, points ouverts) |
 
 ## Ordre d'installation
 

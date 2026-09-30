@@ -18,7 +18,7 @@ in an environment with no network access back to this repo or to `soar8`.
 | `playbooks/source/` | Same CFs/playbooks, extracted — for reading, not for import |
 | `assets/*.json` | Asset config templates (credentials redacted — see below) |
 | `custom_lists/*.json` | Custom list schema (header row only — see Bootstrapping below) |
-| `docs/` | Implementation plan doc, for full design context |
+| `docs/` | Implementation plan doc (full design context) and `uc1_dev_notes.md` (why the code is built the way it is, open items) |
 
 ## Install order
 
