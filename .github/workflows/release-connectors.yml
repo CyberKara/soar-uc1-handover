@@ -1,0 +1,33 @@
+name: Release connectors
+
+# Publishes a GitHub Release for each connectors/<app>-vX.Y.Z.tgz that doesn't
+# have one yet. The workflow and script are in the path filter on purpose: the
+# merge that introduces them also publishes the versions already in the repo.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'connectors/*.tgz'
+      - '.github/workflows/release-connectors.yml'
+      - '.github/scripts/release-connectors.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-connectors
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # tags point at the commit that added each package
+      - name: Publish missing connector releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/release-connectors.sh
