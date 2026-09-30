@@ -2,7 +2,7 @@
 
 **Status:** [x] planned | [x] built | [x] E2E validated | [x] code review fixes | [x] VPE polish | [x] released v5.1 (2026-04-17, clean-slate redeploy container 793)
 
-> **soar8 note (2026-08-01):** this doc's IDs/asset table below (`soar6.karabox.cc:9443`) are the
+> **soar8 note (2026-08-01):** this doc's IDs/asset table below (`<soar-host>:9443`) are the
 > original soar6-era build. Playbooks were carried over to soar8 as-is during the migration and
 > were **silently failing on every timer-fired run since at least 2026-07-21** due to a corrupted
 > `client_key` on the CyberArk CCP asset (`password`-type config fields don't survive the
@@ -186,18 +186,18 @@ creation — the `on_start` guard (check for "Recheck Request" artifact) is what
 **Custom lists:**
 - [x] `cyberark_ccp_rotation_state` (11 columns, see below)
 
-**Dev SOAR asset IDs (soar6.karabox.cc:9443):**
+**Dev SOAR asset IDs (<soar-host>:9443):**
 
 | Asset | ID | Notes |
 |-------|----|-------|
 | `cyberark_ccp` (timer) | 22 | main timer, 1440min |
 | `cyberark_ccp_recheck` (timer) | 26 | disabled in v4 |
 | CyberArk CCP mock | 21 | base_url=https://127.0.0.1:8443 |
-| `f5_api_test` | 12 | description: `cyberark_ccp:safe=F5Safe,user_field=username,pwd_field=password,address=f5.internal.lab` |
-| `splunk_primary` | 23 | description: TestSafe, address=splunk.internal.lab |
-| `splunk_dr` | 24 | description: TestSafe, address=splunk-dr.internal.lab |
+| `f5_api_test` | 12 | description: `cyberark_ccp:safe=F5Safe,user_field=username,pwd_field=password,address=<f5-host>` |
+| `splunk_primary` | 23 | description: TestSafe, address=<splunk-host> |
+| `splunk_dr` | 24 | description: TestSafe, address=<splunk-dr-host> |
 | `app_server_test` | 25 | description: TestSafe/svc_rotating — used for APPAP282E testing |
-| `soar6` (Phantom self-ref) | 14 | points to 192.168.1.168:9443 — used for "no op" wait in recheck handler |
+| `soar6` (Phantom self-ref) | 14 | points to `<redacted-lab-internal-ip>:9443` — used for "no op" wait in recheck handler |
 
 ---
 
@@ -526,7 +526,7 @@ curl -sk -H "ph-auth-token: <TOKEN>" -X POST https://<HOST>/rest/playbook/<OLD_I
 ### Step 10 — Trigger E2E
 
 ```bash
-curl -sk -H "ph-auth-token: <TOKEN>" -X POST https://soar6.karabox.cc:9443/rest/action_run \
+curl -sk -H "ph-auth-token: <TOKEN>" -X POST https://<soar-host>:9443/rest/action_run \
   -H "Content-Type: application/json" \
   -d '{"action":"on poll","name":"manual_trigger","type":"poll","container_id":1,"targets":[{"assets":["cyberark_ccp"],"parameters":[{}],"app_id":149}]}'
 ```
@@ -534,11 +534,11 @@ curl -sk -H "ph-auth-token: <TOKEN>" -X POST https://soar6.karabox.cc:9443/rest/
 Monitor:
 ```bash
 # Latest container
-curl -sk -H "ph-auth-token: <TOKEN>" "https://soar6.karabox.cc:9443/rest/container?sort=id&order=desc&page_size=1"
+curl -sk -H "ph-auth-token: <TOKEN>" "https://<soar-host>:9443/rest/container?sort=id&order=desc&page_size=1"
 # Playbook runs on container
-curl -sk -H "ph-auth-token: <TOKEN>" "https://soar6.karabox.cc:9443/rest/playbook_run?_filter_container=<ID>&sort=id&order=asc"
+curl -sk -H "ph-auth-token: <TOKEN>" "https://<soar-host>:9443/rest/playbook_run?_filter_container=<ID>&sort=id&order=asc"
 # State list
-curl -sk -H "ph-auth-token: <TOKEN>" "https://soar6.karabox.cc:9443/rest/decided_list/cyberark_ccp_rotation_state"
+curl -sk -H "ph-auth-token: <TOKEN>" "https://<soar-host>:9443/rest/decided_list/cyberark_ccp_rotation_state"
 ```
 
 ---
@@ -594,7 +594,7 @@ curl -sk -H "ph-auth-token: <TOKEN>" "https://soar6.karabox.cc:9443/rest/decided
 
 ---
 
-## Post-Build State (soar6.karabox.cc:9443 — 2026-04-17, v4.5 post-review)
+## Post-Build State (<soar-host>:9443 — 2026-04-17, v4.5 post-review)
 
 | Component | SOAR ID | Version | Status |
 |-----------|---------|---------|--------|
