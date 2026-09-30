@@ -1,13 +1,16 @@
 name: Release connectors
 
-# Publishes a GitHub Release for each connectors/<app>-vX.Y.Z.tgz that doesn't
-# have one yet. The workflow and script are in the path filter on purpose: the
-# merge that introduces them also publishes the versions already in the repo.
+# Publishes a GitHub Release for each connector version that doesn't have one
+# yet, detected from a new connectors/<app>-vX.Y.Z.tgz or a bumped app_version
+# in connectors/source/<app>/<app>.json. The workflow and script are in the path
+# filter on purpose: the merge that introduces them also publishes the versions
+# already in the repo.
 on:
   push:
     branches: [master]
     paths:
       - 'connectors/*.tgz'
+      - 'connectors/source/*/*.json'
       - '.github/workflows/release-connectors.yml'
       - '.github/scripts/release-connectors.sh'
   workflow_dispatch:
