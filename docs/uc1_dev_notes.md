@@ -8,7 +8,7 @@ organised by block (function) name. For architecture, flow and setup see
 The original notes file the code pointed to was not part of this package. This one is rebuilt
 from the comments that referenced it, the block notes in the playbook JSON and the plan doc, so
 it holds what the code itself recorded, nothing more. Gaps are listed under
-[Open items](#open-items).
+[Cleanup and open items](#cleanup-and-open-items).
 
 ## Keep in sync and leave alone
 
@@ -100,19 +100,37 @@ These names are hard-coded in the playbooks (and in their JSON `connectorConfigs
 
 `assets/cyberark_ccp.json` is the non-mock CCP asset; the playbooks don't reference it by name.
 
-## Open items
+## Values embedded in the code
 
-Found while moving this material out of the code. None changes behaviour today; they're here so
-they aren't lost.
+Constants and names that live in the code rather than in configuration, in one place. Each
+playbook function repeats the constants it uses instead of sharing module-level ones: the plan
+doc (v4.3 changes) records this as a SOAR Pylint constraint, so the repetition is deliberate.
 
-1. **Password-type fields on `asset_update_configuration`.** The original comment flags a risk
-   around password-type fields on the write-back path, "a known open item, not yet fixed". The
-   details were not preserved. Related context is in the plan doc: a `client_key` corruption on
-   the CCP asset that recurred with no known cause. Nothing here establishes a link.
-2. **Stale operator text in `format_no_targets_note`** (orchestrator `.py` and the JSON node 11
-   template). It tells operators to set each asset's Description to
-   `cyberark_ccp:safe=...`. Discovery has been driven by the `cyberark_ccp_rotation_state`
-   custom list since the 2026-08-03 change described in the plan doc, so the text should point
-   operators at that list and its columns instead.
-3. **The `soar6` asset is undocumented** in `HANDOVER.md` (see the table above). A target SOAR
-   needs an asset with that exact name, or the two blocks must be edited.
+**Playbooks and custom functions**
+
+| Value | Where | Notes |
+|---|---|---|
+| `MAX_RECHECK_ATTEMPTS = 3` | recheck handler: `check_recheck_artifact`, `process_recheck_result` | Upper bound on retries after APPAP282E. |
+| `RECHECK_DELAY_SECONDS = 300` | recheck handler: `check_recheck_artifact`, `wait_before_recheck` | Passed to the `no op` action as `sleep_seconds`. |
+| `STATE_LIST_NAME = "cyberark_ccp_rotation_state"` | orchestrator `update_rotation_state`, recheck `process_recheck_result`; default `list_name` of `asset_get_tagged_for_rotation` | Must match `custom_lists/`. |
+| `PAGE_SIZE = 50`, `MAX_PAGES = 20` | orchestrator `collect_results` | Child-run count query; 1000 rows max. |
+| 30 polls × 2 s | credential rotation `run_test_connectivity` | Connectivity test gives up after about 60 s. |
+| Status message cut to 200 characters | orchestrator `update_rotation_state`, recheck `process_recheck_result` | Keeps list cells bounded. |
+| `local/cyberark_credential_rotation`, `local/cyberark_asset_update_configuration`, `local/cyberark_asset_get_tagged_for_rotation` | `phantom.playbook()` / `phantom.custom_function()` calls | `local` is the SOAR repo the packages must be imported into. |
+| Artifact name `Recheck Request`; container label `cyberark_ccp` | credential rotation `on_finish`, recheck handler, playbook triggers | The label is what routes timer containers to the orchestrator. |
+| Asset names `cyberark ccp mock`, `soar6` | see [Assets the playbooks name](#assets-the-playbooks-name) | |
+| Platform 6.4.1.361, Python 3.13 | playbook/CF JSON (`platform_version`, `python_version`) | Connector: min SOAR 6.4.1, Python 3.13. |
+
+**Connector** (`cyberark_ccp_consts.py` and `initialize`)
+
+| Value | Notes |
+|---|---|
+| `DEFAULT_TIMEOUT = 60` s | Overridden by the asset's `timeout` field. |
+| `MAX_RETRIES = 3` on 500, 502, 503, 504 | Deliberately not 429. GET only, `backoff_factor=1`. |
+| `CCP_API_PATH = /AIMWebService/api/Accounts` | |
+| PEM re-wrapped at 64 columns | `_normalize_pem` handles CERTIFICATE, PRIVATE KEY, RSA and EC PRIVATE KEY blocks. |
+| CyberArk error-code map, response-field map | Documented in the connector README (troubleshooting table, `get secret` returns). |
+
+## Cleanup and open items
+
+Everything still to be cleaned, decided or investigated is tracked in [`TODO.md`](../TODO.md).
