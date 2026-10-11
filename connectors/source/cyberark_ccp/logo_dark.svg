@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="CyberArk Central Credential Provider">
+  <!-- Dark-background variant: same isometric cube, lightened blues so it
+       stays legible against dark UI chrome instead of blending into it. -->
+  <polygon points="100,25 161,60 100,95 39,60" fill="#8ED6F5"/>
+  <polygon points="161,60 161,130 100,165 100,95" fill="#4AC7F4"/>
+  <polygon points="39,60 100,95 100,165 39,130" fill="#38B1E6"/>
+  <polygon points="100,25 161,60 161,130 100,165 39,130 39,60" fill="none" stroke="#F2F6FB" stroke-width="3" stroke-linejoin="round"/>
+</svg>

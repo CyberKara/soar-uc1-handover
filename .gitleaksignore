@@ -1,0 +1,5 @@
+# gitleaks false positive: the PEM header/footer marker strings in _normalize_pem()'s
+# block_types tuple list, not key material (no base64 run over 60 characters anywhere in
+# the package). The pin is path- and line-pinned: re-derive it on every refresh by
+# scanning with this file moved aside.
+connectors/source/cyberark_ccp/cyberark_ccp_connector.py:private-key:334
