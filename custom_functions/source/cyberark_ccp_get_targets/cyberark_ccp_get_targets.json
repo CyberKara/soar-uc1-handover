@@ -1,0 +1,55 @@
+{
+    "name": "cyberark_ccp_get_targets",
+    "custom_function_id": "56ee4142ad03af07da4fb13dc089e1c55119a44e",
+    "description": "Read the CyberArk refresh targets from the list cyberark_ccp_rotation_state and the CyberArk accounts to query.",
+    "draft_mode": false,
+    "inputs": [
+        {
+            "name": "list_name",
+            "description": "Custom list name (default: cyberark_ccp_rotation_state).",
+            "placeholder": "cyberark_ccp_rotation_state",
+            "contains_type": [],
+            "input_type": "item"
+        }
+    ],
+    "outputs": [
+        {
+            "data_path": "targets_json",
+            "description": "JSON: one dict per list row: asset, asset_id, app_id, connector, safe, username, user_field, pwd_field, address, status, message; status 'failed' when the row cannot be used.",
+            "contains_type": []
+        },
+        {
+            "data_path": "has_queries",
+            "description": "yes when at least one account is to be queried, else no.",
+            "contains_type": []
+        },
+        {
+            "data_path": "query_count",
+            "description": "Number of CyberArk accounts to query.",
+            "contains_type": []
+        },
+        {
+            "data_path": "total_count",
+            "description": "Number of targets (list rows).",
+            "contains_type": []
+        },
+        {
+            "data_path": "safes",
+            "description": "Safe of each account to query (parallel to usernames, addresses).",
+            "contains_type": []
+        },
+        {
+            "data_path": "usernames",
+            "description": "Username of each account to query.",
+            "contains_type": []
+        },
+        {
+            "data_path": "addresses",
+            "description": "Address filter of each account to query; empty when not set.",
+            "contains_type": []
+        }
+    ],
+    "outputs_type": "item",
+    "platform_version": "8.6.0.530",
+    "python_version": "3.13"
+}

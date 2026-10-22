@@ -1,22 +1,22 @@
 {
-    "name": "cyberark_asset_update_configuration",
-    "custom_function_id": "646ea269314202692efbfa41758961de5cdea6ce",
-    "description": "Update one or more asset configuration fields via read-merge-write.",
+    "name": "cyberark_ccp_update_asset",
+    "custom_function_id": "de0b71ece2c14852f126dcb0ad51204d229845c9",
+    "description": "Update one or more asset configuration fields; every other field is kept.",
     "draft_mode": false,
     "inputs": [
         {
             "name": "asset",
             "description": "Asset numeric ID or asset name.",
             "placeholder": "my_asset_name",
-            "contains": [],
-            "required": false
+            "contains_type": [],
+            "input_type": "item"
         },
         {
             "name": "configuration_updates",
             "description": "JSON string of configuration fields to update.",
             "placeholder": "{\"password\": \"new_secret\"}",
-            "contains": [],
-            "required": false
+            "contains_type": [],
+            "input_type": "item"
         }
     ],
     "outputs": [
@@ -49,6 +49,6 @@
         }
     ],
     "outputs_type": "item",
-    "platform_version": "6.4.1.361",
+    "platform_version": "8.6.0.530",
     "python_version": "3.13"
 }

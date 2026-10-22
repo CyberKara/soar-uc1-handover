@@ -1,5 +1,18 @@
-# gitleaks false positive: the PEM header/footer marker strings in _normalize_pem()'s
-# block_types tuple list, not key material (no base64 run over 60 characters anywhere in
-# the package). The pin is path- and line-pinned: re-derive it on every refresh by
+# gitleaks false positives, path- and line-pinned: re-derive them on every refresh by
 # scanning with this file moved aside.
+
+# private-key: the PEM header/footer marker strings in _normalize_pem()'s block_types
+# tuple list, not key material (no base64 run over 60 characters anywhere in the package).
 connectors/source/cyberark_ccp/cyberark_ccp_connector.py:private-key:334
+
+# generic-api-key: the VPE's own comparisonKey node field (placeholder comparison_key_0),
+# not a credential.
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:185
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:315
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:387
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:582
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:671
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:817
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:881
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:982
+playbooks/source/cyberark_credential_refresh/cyberark_credential_refresh.json:generic-api-key:1083

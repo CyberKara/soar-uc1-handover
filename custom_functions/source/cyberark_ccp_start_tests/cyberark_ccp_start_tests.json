@@ -1,0 +1,79 @@
+{
+    "name": "cyberark_ccp_start_tests",
+    "custom_function_id": "88ca25b7aa8e8fcb858ccd2763b468c2b404ff93",
+    "description": "Start test connectivity on each asset whose password was written.",
+    "draft_mode": false,
+    "inputs": [
+        {
+            "name": "targets_json",
+            "description": "targets_json of cyberark_ccp_classify_secrets.",
+            "placeholder": "",
+            "contains_type": [],
+            "input_type": "item"
+        },
+        {
+            "name": "written_assets",
+            "description": "asset_name of each cyberark_ccp_update_asset result.",
+            "placeholder": "",
+            "contains_type": [],
+            "input_type": "list"
+        },
+        {
+            "name": "write_success",
+            "description": "success of each cyberark_ccp_update_asset result.",
+            "placeholder": "",
+            "contains_type": [],
+            "input_type": "list"
+        },
+        {
+            "name": "write_messages",
+            "description": "message of each cyberark_ccp_update_asset result.",
+            "placeholder": "",
+            "contains_type": [],
+            "input_type": "list"
+        },
+        {
+            "name": "test_connectivity",
+            "description": "true: test each written asset; false: only write (status written).",
+            "placeholder": "true",
+            "contains_type": [],
+            "input_type": "item"
+        },
+        {
+            "name": "wait_seconds",
+            "description": "Seconds the next block waits for the tests (default 60).",
+            "placeholder": "60",
+            "contains_type": [],
+            "input_type": "item"
+        },
+        {
+            "name": "container_id",
+            "description": "Container the tests run on.",
+            "placeholder": "",
+            "contains_type": [
+                "phantom container id"
+            ],
+            "input_type": "item"
+        }
+    ],
+    "outputs": [
+        {
+            "data_path": "targets_json",
+            "description": "The targets, with the written ones marked and their test run ids.",
+            "contains_type": []
+        },
+        {
+            "data_path": "test_count",
+            "description": "Number of tests started.",
+            "contains_type": []
+        },
+        {
+            "data_path": "wait_seconds",
+            "description": "wait_seconds when a test started, else 1.",
+            "contains_type": []
+        }
+    ],
+    "outputs_type": "item",
+    "platform_version": "8.6.0.530",
+    "python_version": "3.13"
+}

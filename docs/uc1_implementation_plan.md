@@ -1,112 +1,87 @@
-# Automated Credential Rotation (UC1) — Implementation Plan
+# Automated Credential Refresh (UC1) — Implementation Plan
 
-Current design. How it got here (releases, migrations, investigations): `uc1_history.md`, not shipped
-in the handover. Open work: the Splunk project's `docs/next-steps.md` (not shipped).
+Current design (since 2026-10-22). How it got here: `uc1_rework_plan.md` (the push-vs-pull challenge
+and the decisions) and `uc1_history.md`; neither is shipped in the handover. Open work: the Splunk
+project's `docs/next-steps.md` (not shipped).
 
 ## Scope
 
-- SOAR assets (F5, Splunk, app servers…) hold credentials that CyberArk rotates in its vault. On a
-  timer, UC1 fetches each target asset's current password from CyberArk CCP (AppID + mTLS), writes it
-  into the asset's configuration and tests the asset's connectivity.
-- When CyberArk reports a password change in progress (APPAP282E), the target is retried 5 minutes
-  later, at most 3 times.
+- SOAR assets (F5, Splunk, app servers…) hold credentials that CyberArk changes in its vault. On a
+  timer, UC1 reads each target's current password from CyberArk CCP (AppID + mTLS), writes it into the
+  asset's password field and, optionally, tests the asset's connectivity.
 - The targets and their last result live in one custom list, `cyberark_ccp_rotation_state`.
+- SOAR's built-in password vault would fetch passwords at use instead; it has no CCP provider, so it
+  does not fit a CCP-only CyberArk (rework plan, section 3).
 - Out of scope: rotation history (the list keeps the latest result only), notifications beyond the
   container note.
 
 ## Architecture
 
-| Component | Type | Trigger / label | Role |
-|---|---|---|---|
-| `cyberark_rotation_orchestrator` | automation, active | `cyberark_ccp` | Reads the targets, starts one rotation per target, writes the summary note, the list and the severity |
-| `cyberark_credential_rotation` | data | — (run by the other two) | Rotates one target |
-| `cyberark_recheck_handler` | automation, active | `cyberark_ccp` | Retries a target after a `Recheck Request` artifact |
-| CF `cyberark_asset_get_tagged_for_rotation` | custom function | orchestrator | Reads the targets from the list |
-| CF `cyberark_asset_update_configuration` | custom function | rotation | Read-merge-write of one asset's configuration |
+One automation playbook, `cyberark_credential_refresh` (label `cyberark_ccp`, trigger
+`artifact_created`, active), and five custom functions `cyberark_ccp_*`. Native blocks only: utility
+(the custom functions), filter, action. No child playbook, no recheck handler, no code block.
 
 ```
-Timer asset cyberark_ccp (label cyberark_ccp, every 24 h) → new container
-  → orchestrator: discover_targets (CF) → read_discover_result → check_targets
-       no target → format_no_targets_note → add_note_no_targets (asset soar8)
-       targets   → dispatch_rotations: phantom.playbook(cyberark_credential_rotation) per target
-                 → collect_results → build_summary → add_summary_note
-                 → update_rotation_state → update_severity
-  → rotation (per target): validate_inputs → get_secret_from_vault (asset cyberark ccp mock)
-       → build_config_update → update_decision
-            ready → update_target_asset (CF) → run_test_connectivity
-            error → format_error
-       on_finish: playbook output; APPAP282E → Recheck Request artifact (run_automation)
-  → recheck handler (on that artifact): check_recheck_artifact → wait_before_recheck
-       (no op 300 s, asset soar8) → dispatch_recheck → process_recheck_result
+Timer asset cyberark_ccp (every 24 h) → container + one artifact
+  → read_targets (cyberark_ccp_get_targets)          targets + the CyberArk accounts to query
+  → filter anything_to_query
+       no  → report_nothing_queried (cyberark_ccp_report)
+       yes → get_secrets: get secret, one result per account (asset cyberark ccp mock)
+           → classify_secrets (cyberark_ccp_classify_secrets)   write | pending (APPAP282E) | failed
+           → filter anything_to_write
+                no  → report_nothing_written (cyberark_ccp_report)
+                yes → write_passwords (cyberark_ccp_update_asset)   {pwd_field: password} per asset
+                    → start_tests (cyberark_ccp_start_tests)         REST test connectivity per asset
+                    → wait_for_tests: no op (asset soar8)
+                    → report (cyberark_ccp_report)                    list, one note, severity
 ```
 
-**Rules the code follows:**
+The targets travel from one function to the next as `targets_json` (asset, safe, username,
+fields, status, message — never a password).
 
-- Both automation playbooks trigger on `artifact_created`: the Timer's container arrives with an
-  artifact (a container created without one triggers nothing), and every later artifact of the label
-  starts both again. The orchestrator runs once per container and skips a container that holds a
-  `Recheck Request`; the recheck handler skips one that holds none.
-- After a `phantom.playbook()` callback, only synchronous platform APIs are used
-  (`phantom.add_note`, `get_list`/`set_list`, `set_severity`, `add_artifact`, REST reads): an
-  asynchronous `phantom.act` or custom function would race `on_finish`. That is why the summary,
-  list and severity are code blocks, not a CF or an action.
-- The VPE has no for-each and no "join N children" block: `dispatch_rotations` starts one child per
-  target, and `collect_results` counts finished children over REST (paginated, idempotent) instead
-  of a run-data counter.
-- A CyberArk failure never writes a credential: `format_error` skips the asset update.
+**Rules the design follows:**
 
-## Playbooks
+- A password never passes through a block output: `classify_secrets` gets statuses and messages
+  only, and `write_passwords`' Custom Code reads the password from `get_secrets`' result.
+- A write sends only the password field. SOAR keeps every configuration key a POST leaves out, and a
+  read-back password field is `********`: posting it back would store that.
+- Each "nothing to do" branch has its own report block (same function), so no block has two incoming
+  paths. The filters compare a `yes`/`no` output, not a number.
+- The test runs over REST (`POST /rest/action_run`) inside a custom function: a native action block
+  runs on an asset chosen in the editor, this one is chosen at run time. The wait is a native `no op`.
+- Custom Code is left in two blocks only: `get_secrets` unzips the three bound lists into one
+  parameter set per account, `write_passwords` adds each password. A VPE save keeps both.
+- A second run on the same container (an artifact added later, a manual run) refreshes again; that is
+  harmless, so there is no re-entry guard.
 
-### `cyberark_rotation_orchestrator`
+## Playbook `cyberark_credential_refresh`
 
-No inputs or outputs. `discover_targets` calls the discovery CF; `read_discover_result` exists only
-because a utility block edged straight into a decision misrenders in the VPE. No target → the note
-`Credential Rotation - No Targets` (written through the `soar8` asset). Otherwise each child gets
-`target_asset`, `safe`, `username`, `pwd_field`, `user_field`, `address`; when all have finished,
-`build_summary` writes `Credential Rotation - <date time>` (one row per target) and sets the
-container severity: all success → low, any failed → high, any pending → medium. A discovery failure
-with nothing rotated counts as failed. `collect_results`' "summary done" guard is check-then-act, so
-`add_summary_note` also checks for an existing summary note before writing.
+Settings are input values on the `start_tests` block, edited on the canvas: `test_connectivity`
+(`true`; `false` = write only, status `written`) and `wait_seconds` (60; the wait is 1 second when no
+test started).
 
-### `cyberark_credential_rotation`
+| Status | Meaning | Severity |
+|---|---|---|
+| `success` | Written; test connectivity passed | low |
+| `written` | Written; test connectivity switched off | low |
+| `written (test failed)` | Written; the test failed (the connector's reason in the message) | high |
+| `written (no test result)` | Written; the test did not start or was still running after the wait | medium |
+| `written (change pending)` | CCP returned the password with `PasswordChangeInProcess`; the next run writes the new one | medium |
+| `pending` | APPAP282E: nothing written, the next run retries | medium |
+| `failed` | CyberArk error, row unusable (asset missing, username field empty…) or write refused | high |
 
-Inputs: `target_asset`, `safe`, `username`, `pwd_field`, `user_field`, `address` (optional).
-Output: `status`.
+The container gets the highest severity of its rows. The note `Credential Refresh - <date time>`
+holds one table row per target (split in parts over 19,000 characters).
 
-- `validate_inputs` (native decision): `safe` and `username` must be set, else `format_error`.
-- `get_secret_from_vault` (`get secret`; `address` is sent only when set).
-- `build_config_update` parses the reply: APPAP282E / `password_change_in_process` → error path;
-  else the config update keyed by `pwd_field`.
-- `update_target_asset` (CF) writes it; `run_test_connectivity` checks the CF result, then runs
-  `test connectivity` on the target asset over REST (`POST /rest/action_run` + poll): a native action
-  block needs an asset chosen at design time, this one is chosen at run time.
-- `on_finish` saves the output and, for APPAP282E, adds a `Recheck Request` artifact with
-  `run_automation` on: `cs1` target asset, `cn1` attempt (1), `cs2` the rotation parameters (JSON).
+## Custom functions
 
-Statuses: `success` (rotated, connectivity passed), `rotated (connectivity failed)`, `rotated (no test
-result)` (the target's app has no working `test connectivity`), `rotated (change pending)`,
-`pending_recheck` (APPAP282E), `failed`.
-
-### `cyberark_recheck_handler`
-
-`check_recheck_artifact` takes the newest `Recheck Request` that has not been dispatched yet (several
-targets can have one in the same container; the dispatch name is per target and attempt) and stops
-after attempt 3 with `Recheck Failed - Max Attempts`. `wait_before_recheck` is a `no op` of 300 s on
-the `soar8` asset. `process_recheck_result` reads the child's output over REST, updates the list,
-writes `Recheck Succeeded - <asset>` or `Recheck Failed - <asset>`, adds the next `Recheck Request`
-(attempt + 1) while CyberArk still answers APPAP282E, and re-evaluates the container severity from
-the whole list.
-
-### Custom functions
-
-- `cyberark_asset_get_tagged_for_rotation` (input `list_name`, default the state list): for each row,
-  looks the asset up by name (skips a row whose asset no longer exists), reads the username from the
-  asset's `user_field`, and resolves the app name over `GET /rest/app/{id}` (an asset's `app_name` is
-  empty in automation context). Outputs: `asset_name`, `asset_id`, `safe`, `username`, `user_field`,
-  `pwd_field`, `address`, `app_name`, `total_count`.
-- `cyberark_asset_update_configuration` (inputs `asset`, `configuration_updates` JSON): `GET
-  /rest/asset/{id}`, merge, `POST` the full record (name, tags, description, configuration — an omitted
-  field is reset). Outputs: `success`, `asset_id`, `asset_name`, `updated_fields`, `message`.
+| Function | Inputs | Does |
+|---|---|---|
+| `cyberark_ccp_get_targets` | `list_name` | One target per list row with the asset's id, app id and app name (`?pretty`: the Automation role cannot read apps) and the username from its `user_field`; an unusable row is `failed`. Outputs `targets_json`, `has_queries`, and the accounts to query as parallel lists `safes`, `usernames`, `addresses` (one per account) |
+| `cyberark_ccp_classify_secrets` | `targets_json`; lists of `get secret` parameter safe/username/address, status, message, `password_change_in_process` | Marks each target write, `pending` or `failed`. Outputs `targets_json`, `has_writes`, `write_assets`, `write_fields` |
+| `cyberark_ccp_update_asset` | `asset`, `configuration_updates` (JSON) | Posts only the given keys plus the asset's name, tags and description; echoes `asset_name` on failure too |
+| `cyberark_ccp_start_tests` | `targets_json`; lists of update results; `test_connectivity`, `wait_seconds`, `container_id` | Starts test connectivity per written asset over REST. Outputs `targets_json`, `test_count`, `wait_seconds` |
+| `cyberark_ccp_report` | `targets_json`, `container_id`, `list_name` | Reads the test results (the reason from the app run), writes columns 6-11 of the list, one note, the container severity (REST) |
 
 ## Data model
 
@@ -115,61 +90,66 @@ the whole list.
 | # | Column | Written by |
 |---|---|---|
 | 1-5 | `asset`, `safe`, `user_field`, `pwd_field`, `address` (optional) | the operator |
-| 6-7 | `connector`, `username` | the orchestrator, from discovery |
-| 8-11 | `status`, `message`, `last_rotated`, `event_link` | the orchestrator and the recheck handler |
+| 6-7 | `connector`, `username` | the playbook, from the asset |
+| 8-11 | `status`, `message`, `last_rotated`, `event_link` | the playbook |
 
-`user_field` / `pwd_field` are the target asset's configuration keys that hold the username and the
-password. `address` tells apart CyberArk accounts with the same username in one safe.
-
-**Connector `cyberark_ccp`:** `get secret` (`safe`, `username`, optional `object`, `address`) against
-CCP's `/AIMWebService/api/Accounts` with the asset's AppID, over mTLS (PEM cert/key written to temp files per call).
-APPAP282E means the password is being changed in the vault.
+`user_field` / `pwd_field` are the target asset's configuration keys for the username and the
+password. `address` tells apart CyberArk accounts with the same username in one safe. The playbook
+rewrites columns 6-11 and keeps the operator's rows and their order.
 
 ## Setup Guide
 
-1. **Label** `cyberark_ccp` (Administration → Event Settings → Labels).
-2. **Automation user** for the two automation playbooks, role **Admin**: the asset write runs through
-   REST as that user, and a weaker role makes every rotation fail with HTTP 403.
+1. **Label** `cyberark_ccp` (Administration → Event Settings → Labels). Restrict who can see it: the
+   `get secret` results on its containers hold the passwords (Known limitations).
+2. **Role** `cyberark_credential_refresh`: a copy of the built-in Automation role with **Assets: Edit**
+   allowed. **Automation user** (e.g. `cyberark_refresh`) with that role. Without asset edit every
+   write reads `User "…" is not authorized to edit assets`. Administrator is not needed.
 3. **Apps:** CyberArk CCP (this package's connector), Timer, and the SOAR (Phantom) app; each target
-   asset's own app needs a working `test connectivity`, or its status is `rotated (no test result)`.
-4. **Assets** (the playbooks ship pointed at these names; keep them, or re-point the blocks in the VPE
+   asset's own app needs a working `test connectivity`, or its status is `written (no test result)`.
+4. **Assets** (the playbook ships pointed at these names; keep them, or re-point the blocks in the VPE
    and save):
 
    | Asset | App | Settings | Used by |
    |---|---|---|---|
-   | `cyberark ccp mock` | CyberArk CCP | `base_url`, `app_id`, `client_cert`/`client_key` (PEM), `client_ca`, `verify_ssl`, `timeout`, `test_safe`/`test_username` (the account Test Connectivity reads); Test Connectivity before going on | `get_secret_from_vault` |
-   | `cyberark_ccp` | Timer | label `cyberark_ccp`, interval 1440 min | trigger |
-   | `soar8` | SOAR (Phantom) | the SOAR instance itself | `add_note_no_targets`, `wait_before_recheck` |
+   | `cyberark ccp mock` | CyberArk CCP | `base_url`, `app_id`, `client_cert`/`client_key` (PEM), `client_ca`, `verify_ssl`, `timeout`, `test_safe`/`test_username`; Test Connectivity before going on | `get_secrets` |
+   | `cyberark_ccp` | Timer | label `cyberark_ccp`, interval 1440 min (shorter = smaller stale window) | trigger |
+   | `soar8` | SOAR (Phantom) | the SOAR instance itself | `wait_for_tests` |
 
    Enter every credential by hand: password fields do not cross the air gap as usable values.
 5. **Custom list** `cyberark_ccp_rotation_state` with the header row `asset, safe, user_field,
    pwd_field, address, connector, username, status, message, last_rotated, event_link`, then one row
    per target with columns 1-5 filled.
-6. **Import** the two CFs (and publish them), then the three playbooks.
-7. **Activate** `cyberark_rotation_orchestrator` and `cyberark_recheck_handler`, **Run As** the
-   automation user; leave `cyberark_credential_rotation` inactive. After any redeploy, read the active
-   flags back.
+6. **Import** the five `cyberark_ccp_*` custom functions (and publish them), then the playbook.
+7. **In the VPE:** Playbook Settings → **Run As** the automation user of step 2, save, then
+   **activate** it. Run As is not carried by an import; check it after every re-import.
 
 ## Verification
 
-- **No target:** a new `cyberark_ccp` container with one artifact (as the Timer creates it) and no
-  target row → one orchestrator run and the note `Credential Rotation - No Targets`.
-- **Rotation:** one row for a test asset → `success` in the list and the summary note; the asset's
-  tags and description unchanged; severity low.
-- **APPAP282E:** a target whose CyberArk answer is APPAP282E (the lab mock answers it on the first
-  call for its test account) → `pending_recheck`, a `Recheck Request` artifact, a retry after 300 s,
-  then `Recheck Succeeded`; three APPAP282E in a row → `Recheck Failed - Max Attempts`.
-- **Logs** on the SOAR host (as `phantom`): `spawn.log`, `decided.log`, `actiond.log`.
+Lab, soar8, 2026-10-22 (code-block version: containers 5938, 5940-5946; this version: 5951-5955):
+
+| Case | Result |
+|---|---|
+| Target in the list, right password in CyberArk | `success`: written, test connectivity passed |
+| Wrong password in CyberArk | `written (test failed)` with the connector's reason: the write happened |
+| APPAP282E (first request for a changing account) | `pending`, nothing written |
+| Unknown safe / asset missing from SOAR | `failed`, with CyberArk's message / `Asset not found` |
+| Automation user without asset edit | `failed`: `User "automation" is not authorized to edit assets` |
+| `test_connectivity` false | `written`, no test, a 1-second wait |
+| Nothing to write (only pending / failed) | `report_nothing_written`: one note |
+| Empty list | `report_nothing_queried`: one note `No target`, severity low |
+| Run As `cyberark_refresh` (Automation + asset edit), `automation` without it | `success` (playbook 742, container 5974) |
+
+Not reproduced in the lab: `written (change pending)` (the mock answers APPAP282E whenever the flag
+is set, as CCP does with `FailRequestOnPasswordChange`) and `written (no test result)`.
+
+On the appliance: one row for a test asset → `success` in the list and the note.
 
 ## Known limitations
 
-- `cyberark_asset_update_configuration` writes every configuration field back, password fields
-  included; a password field read over REST comes back encrypted, so any password field other than
-  the one rotated can be corrupted. The CyberArk asset's own `client_key` was corrupted twice that
-  way. Not fixed.
-- `collect_results`' guard is not atomic (accepted residual race, memory
-  `project_uc1_deferred_finding_4.md`), and it has no timeout; the recheck handler wakes on every
-  artifact of the label.
-- `cyberark_credential_rotation`'s `format_error` is reached from two alternative paths; a VPE save
-  turns that into a join. `run_test_connectivity` polls with `sleep` (lint W0001).
+- The password is visible to anyone who can open the `cyberark_ccp` containers: in the `get secret`
+  action result and in the `write_passwords` (`cyberark_ccp_update_asset`) run's parameters. Restrict
+  the label.
+- After CyberArk changes a password, the asset keeps the old one until the next run (up to the Timer
+  interval); `pending` and `written (change pending)` also wait for the next run.
+- Run As is set by hand in the VPE.
 - The list keeps the latest result per asset only.

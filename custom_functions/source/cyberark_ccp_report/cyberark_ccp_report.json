@@ -1,0 +1,46 @@
+{
+    "name": "cyberark_ccp_report",
+    "custom_function_id": "1c840d07a9b19a1c425c0379a783be7154bc75e5",
+    "description": "Write the refresh result to the list, one note and the container severity.",
+    "draft_mode": false,
+    "inputs": [
+        {
+            "name": "targets_json",
+            "description": "targets_json of the last cyberark_ccp_* function that ran.",
+            "placeholder": "",
+            "contains_type": [],
+            "input_type": "item"
+        },
+        {
+            "name": "container_id",
+            "description": "Container to write the note and the severity on.",
+            "placeholder": "",
+            "contains_type": [
+                "phantom container id"
+            ],
+            "input_type": "item"
+        },
+        {
+            "name": "list_name",
+            "description": "Custom list name (default: cyberark_ccp_rotation_state).",
+            "placeholder": "cyberark_ccp_rotation_state",
+            "contains_type": [],
+            "input_type": "item"
+        }
+    ],
+    "outputs": [
+        {
+            "data_path": "summary",
+            "description": "One line: the number of targets per status.",
+            "contains_type": []
+        },
+        {
+            "data_path": "severity",
+            "description": "Severity set on the container: high, medium or low.",
+            "contains_type": []
+        }
+    ],
+    "outputs_type": "item",
+    "platform_version": "8.6.0.530",
+    "python_version": "3.13"
+}

@@ -1,6 +1,6 @@
-def cyberark_asset_update_configuration(asset=None, configuration_updates=None, **kwargs):
+def cyberark_ccp_update_asset(asset=None, configuration_updates=None, **kwargs):
     """
-    Update one or more asset configuration fields via read-merge-write.
+    Update one or more asset configuration fields; every other field is kept.
     
     Args:
         asset: Asset numeric ID or asset name.
@@ -68,27 +68,24 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
     else:
         raise TypeError("asset must be a numeric ID or string name")
 
-    # Step 1: Read current asset configuration
+    # Read the asset for its id, name, tags and description only
     current = phantom.requests.get(uri=asset_url, verify=False).json()
 
     if not current.get("id"):
         raise RuntimeError("Failed to read asset: {}".format(asset))
 
-    current_config = current.get("configuration") or {}
     asset_id = current["id"]
     asset_name = current.get("name", "")
+    updated_fields = list(updates)
+    # Echoed on failure too: a caller matches results to its assets by name
+    outputs["asset_id"] = asset_id
+    outputs["asset_name"] = asset_name
 
-    # Step 2: Merge updates into current config (only overwrite specified fields)
-    merged_config = dict(current_config)
-    updated_fields = []
-    for key, value in updates.items():
-        merged_config[key] = value
-        updated_fields.append(key)
-
-    # Step 3: Write back full config + tags/name/description. Password-type fields
-    # are written back too: a known limitation (UC1 plan, Known limitations).
+    # Send only the updated keys: SOAR keeps every configuration key the POST
+    # leaves out. GET returns each password field as "********", and posting
+    # that back would store "********" as the password.
     payload = {
-        "configuration": merged_config,
+        "configuration": updates,
         "tags": current.get("tags", []),
         "name": asset_name,
         "description": current.get("description", ""),
@@ -97,8 +94,6 @@ def cyberark_asset_update_configuration(asset=None, configuration_updates=None, 
 
     if response.get("success"):
         outputs["success"] = True
-        outputs["asset_id"] = asset_id
-        outputs["asset_name"] = asset_name
         outputs["updated_fields"] = updated_fields
         outputs["message"] = "Successfully updated {} field(s): {}".format(
             len(updated_fields), ", ".join(updated_fields)
